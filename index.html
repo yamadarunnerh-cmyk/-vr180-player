@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v7.1</title>
+<title>VR180 SBS Player v8</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -13,6 +13,12 @@
 .debug{position:absolute;top:max(8px,env(safe-area-inset-top));right:10px;padding:7px 9px;background:#000b;border-radius:9px;font:11px ui-monospace,monospace;z-index:3;text-align:right}
 .panel{position:absolute;z-index:4;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));padding:11px;background:#000c;border:1px solid #ffffff2b;border-radius:15px;backdrop-filter:blur(10px);transition:.2s}
 .panel.hidden{opacity:0;pointer-events:none}.row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.reticle{display:none;position:absolute;z-index:8;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid #fff;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px #0008}
+.reticle:after{content:'';position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:#fff}
+.reticle.aim{transform:scale(1.25);box-shadow:0 0 0 3px #fff5}
+#app.vr .reticle{display:block}
+#app.vr .panel{left:50%;right:auto;width:min(94vw,760px);transform:translateX(-50%)}
+#app.vr .panel.hidden{opacity:0;pointer-events:none}
 button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:11px 13px;font-size:14px;font-weight:650}.file input{display:none}button.on{background:#fff;color:#000}
 #vr{background:#0a67ff}#vr.on{background:#fff;color:#000}input[type=range]{flex:1;min-width:110px}.hint{font-size:11px;color:#aaa;margin-top:8px;line-height:1.35}
 </style>
@@ -20,6 +26,7 @@ button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:1
 <body><div id="app">
 <video id="video" playsinline webkit-playsinline preload="metadata"></video>
 <canvas id="gl"></canvas>
+<div class="reticle" id="reticle"></div>
 <div class="panel" id="panel">
  <div class="row">
   <label class="file">動画を選択<input id="file" type="file" accept="video/*"></label>
@@ -34,7 +41,7 @@ button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:1
 'use strict';
 const $=s=>document.querySelector(s);
 const video=$('#video'),canvas=$('#gl'),fileEl=$('#file'),playBtn=$('#play'),gyroBtn=$('#gyro'),vrBtn=$('#vr'),resetBtn=$('#reset');
-const seekEl=$('#seek'),timeEl=$('#time'),durationEl=$('#duration'),fovEl=$('#fov'),fovv=$('#fovv'),panel=$('#panel');
+const seekEl=$('#seek'),timeEl=$('#time'),durationEl=$('#duration'),fovEl=$('#fov'),fovv=$('#fovv'),panel=$('#panel'),app=$('#app'),reticle=$('#reticle');
 const gl=canvas.getContext('webgl',{antialias:false,alpha:false});
 if(!gl) alert('この端末ではWebGLを利用できません。');
 const vs=`attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
@@ -49,7 +56,7 @@ const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRA
 const ap=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(ap);gl.vertexAttribPointer(ap,2,gl.FLOAT,false,0,0);
 const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 const loc={tex:gl.getUniformLocation(pr,'tex'),res:gl.getUniformLocation(pr,'res'),yaw:gl.getUniformLocation(pr,'yaw'),pitch:gl.getUniformLocation(pr,'pitch'),fov:gl.getUniformLocation(pr,'fov'),stereo:gl.getUniformLocation(pr,'stereo')};
-let manualYaw=0,manualPitch=0,gyroYaw=0,gyroPitch=0,vrMode=false,lastURL=null,drag=false,lx=0,ly=0,baseQ=null,gyroActive=false,lastA=0,lastB=0,lastG=0;
+let manualYaw=0,manualPitch=0,gyroYaw=0,gyroPitch=0,vrMode=false,lastURL=null,drag=false,lx=0,ly=0,baseQ=null,gyroActive=false,lastA=0,lastB=0,lastG=0,uiTimer=null,gazeTimer=null,gazeTarget=null;
 function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*d);canvas.height=Math.round(innerHeight*d);gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,150));resize();
 function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
 const fmt=s=>!isFinite(s)?'0:00':Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
@@ -57,11 +64,26 @@ fileEl.onchange=e=>{const f=e.target.files?.[0];if(!f)return;video.pause();if(la
 playBtn.onclick=async()=>{if(!video.src){alert('先に動画を選択してください');return}try{if(video.paused){await video.play();playBtn.textContent='❚❚ 停止'}else{video.pause();playBtn.textContent='▶ 再生'}}catch(e){alert('Safariで動画を再生できません。動画のコーデックを確認してください。')}};
 video.onloadedmetadata=()=>durationEl.textContent=fmt(video.duration);video.ontimeupdate=()=>{timeEl.textContent=fmt(video.currentTime);seekEl.value=video.duration?video.currentTime/video.duration*1000:0};video.onended=()=>{playBtn.textContent='▶ 再生'};
 seekEl.oninput=()=>{if(video.duration)video.currentTime=seekEl.value/1000*video.duration};fovEl.oninput=()=>fovv.textContent=fovEl.value+'°';
-vrBtn.onclick=()=>{vrMode=!vrMode;vrBtn.classList.toggle('on',vrMode);vrBtn.textContent=vrMode?'✓ VR解除':'🥽 VRモード';panel.classList.toggle('hidden',vrMode);setTimeout(resize,50)};
+function hideVRPanel(){if(vrMode){panel.classList.add('hidden');reticle.classList.remove('aim');gazeTarget=null;clearTimeout(gazeTimer)}}
+function showVRPanel(){if(!vrMode)return;panel.classList.remove('hidden');clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,6000)}
+function gazeCheck(){
+ if(!vrMode||panel.classList.contains('hidden')){requestAnimationFrame(gazeCheck);return}
+ const x=innerWidth/2,y=innerHeight/2,el=document.elementFromPoint(x,y);
+ const target=el?.closest?.('button,.file,input[type=range]');
+ if(target!==gazeTarget){
+   clearTimeout(gazeTimer);gazeTarget=target;reticle.classList.toggle('aim',!!target);
+   if(target && !target.matches('input[type=range]')){
+     gazeTimer=setTimeout(()=>{target.click();showVRPanel();gazeTarget=null;reticle.classList.remove('aim')},900);
+   }
+ }
+ requestAnimationFrame(gazeCheck)
+}
+gazeCheck();
+vrBtn.onclick=()=>{vrMode=!vrMode;app.classList.toggle('vr',vrMode);vrBtn.classList.toggle('on',vrMode);vrBtn.textContent=vrMode?'✓ VR解除':'🥽 VRモード';if(vrMode)hideVRPanel();else{panel.classList.remove('hidden');clearTimeout(uiTimer)}setTimeout(resize,50)};
 resetBtn.onclick=()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null};
-canvas.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY});
-canvas.addEventListener('pointermove',e=>{if(!drag)return;manualYaw+=(e.clientX-lx)*.005;manualPitch+=(e.clientY-ly)*.005;lx=e.clientX;ly=e.clientY});
-addEventListener('pointerup',()=>drag=false);canvas.addEventListener('dblclick',()=>panel.classList.toggle('hidden'));
+canvas.addEventListener('pointerdown',e=>{if(vrMode){showVRPanel();return}drag=true;lx=e.clientX;ly=e.clientY});
+canvas.addEventListener('pointermove',e=>{if(vrMode||!drag)return;manualYaw+=(e.clientX-lx)*.005;manualPitch+=(e.clientY-ly)*.005;lx=e.clientX;ly=e.clientY});
+addEventListener('pointerup',()=>drag=false);
 
 /* DeviceOrientation: W3C/three.js型の Z-X'-Y'' を quaternion 化し、初期姿勢との差分から視線ベクトルを取得 */
 const mul=(a,b)=>[a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]];
