@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v30</title>
+<title>VR180 SBS Player v31</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -16,9 +16,9 @@
 .reticle{display:none;position:absolute;z-index:8;top:50%;width:18px;height:18px;margin-top:-9px;border:2px solid #fff;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px #0008}
 .reticle:after{content:'';position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:#fff}
 .reticle.aim{transform:scale(1.25);box-shadow:0 0 0 3px #fff5}
-#reticleL{left:25%;margin-left:-9px}#reticleR{left:75%;margin-left:-9px}
+#reticleL{left:28%;margin-left:-9px}#reticleR{left:72%;margin-left:-9px}
 .vrhud{display:none;position:absolute;z-index:7;top:62%;width:42vw;max-width:360px;padding:10px;background:#0009;border:1px solid #ffffff30;border-radius:16px;backdrop-filter:blur(8px);transform:translate(-50%,-50%);transition:opacity .2s}
-#vrhudL{left:25%}#vrhudR{left:75%}
+#vrhudL{left:28%}#vrhudR{left:72%}
 .vrhud.show{display:flex;gap:7px;justify-content:center;align-items:center;flex-wrap:wrap}
 .vrhud button{font-size:13px;padding:9px 10px;white-space:nowrap}
 .vrhud .seekrow{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:11px}
@@ -60,7 +60,7 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 </div></div>
 <script>
 'use strict';
-const BUILD='v30';
+const BUILD='v31';
 try{
   const k='vr180-build-seen';
   if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
@@ -166,7 +166,7 @@ function activateVRAction(act){
 function gazeCheck(){
  updateVRHud();
  if(!vrMode||!vrhuds[0].classList.contains('show')){requestAnimationFrame(gazeCheck);return}
- const points=[innerWidth*.25,innerWidth*.75];
+ const points=[innerWidth*.28,innerWidth*.72];
  let target=null,eye=-1;
  for(let i=0;i<2;i++){
    const el=document.elementFromPoint(points[i],innerHeight/2);
