@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v11</title>
+<title>VR180 SBS Player v12</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -104,6 +104,14 @@ function gazeCheck(){
   clearTimeout(gazeTimer);gazeTarget=target;reticle.classList.toggle('aim',!!target);
   if(target && target!==vrSeek){const dwell=1000;gazeTimer=setTimeout(()=>{target.click();gazeTarget=null;reticle.classList.remove('aim')},dwell)}
  }
+ if(target===vrSeek && video.duration){
+   const r=vrSeek.getBoundingClientRect();
+   const ratio=Math.max(0,Math.min(1,(innerWidth/2-r.left)/r.width));
+   vrSeek.value=Math.round(ratio*1000);
+   video.currentTime=ratio*video.duration;
+   syncVRSeek();
+   clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000);
+ }
  requestAnimationFrame(gazeCheck)
 }
 gazeCheck();
@@ -115,7 +123,15 @@ function setVRMode(on){
 }
 vrBtn.onclick=()=>setVRMode(!vrMode);
 vrPlay.onclick=()=>{playBtn.click();setTimeout(()=>{vrPlay.textContent=video.paused?'▶ 再生':'❚❚ 停止'},50);clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,2500)};
-vrReset.onclick=()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null;hideVRPanel()};
+vrReset.onclick=()=>{
+ vrReset.textContent='◎ 3…'; clearTimeout(uiTimer);
+ setTimeout(()=>vrReset.textContent='◎ 2…',1000);
+ setTimeout(()=>vrReset.textContent='◎ 1…',2000);
+ setTimeout(()=>{
+   manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null;
+   vrReset.textContent='◎ 正面'; hideVRPanel();
+ },3000);
+};
 vrExit.onclick=()=>setVRMode(false);
 vrSeek.oninput=()=>{if(video.duration)video.currentTime=(+vrSeek.value/1000)*video.duration;clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000)};
 function syncVRSeek(){
