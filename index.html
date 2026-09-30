@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v31</title>
+<title>VR180 SBS Player v32</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -60,7 +60,7 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 </div></div>
 <script>
 'use strict';
-const BUILD='v31';
+const BUILD='v32';
 try{
   const k='vr180-build-seen';
   if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
@@ -146,10 +146,7 @@ function showVRPanel(){
 }
 function updateVRHud(){
  if(!vrMode||!vrhuds[0].classList.contains('show'))return;
- const v=currentView();let dy=hudYaw-v.yaw,dp=hudPitch-v.pitch;
- while(dy>Math.PI)dy-=Math.PI*2;while(dy<-Math.PI)dy+=Math.PI*2;
- const scale=innerWidth/1.25;
- vrhuds.forEach((h,i)=>h.style.transform=`translate(calc(-50% + ${dy*scale*.5}px),calc(-50% + ${dp*scale}px))`);
+ vrhuds.forEach(h=>h.style.transform='translate(-50%,-50%)');
 }
 function activateVRAction(act){
  if(act==='play'){
@@ -211,7 +208,7 @@ video.addEventListener('loadedmetadata',syncVRSeek);
 
 resetBtn.onclick=()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null};
 canvas.addEventListener('pointerdown',e=>{
- if(vrMode){if(!vrhuds[0].classList.contains('show'))showVRPanel();return}
+ if(vrMode){if(vrhuds[0].classList.contains('show'))hideVRPanel();else showVRPanel();return}
  drag=true;lx=e.clientX;ly=e.clientY
 });
 canvas.addEventListener('pointermove',e=>{if(vrMode||!drag)return;manualYaw+=(e.clientX-lx)*.005;manualPitch+=(e.clientY-ly)*.005;lx=e.clientX;ly=e.clientY});
