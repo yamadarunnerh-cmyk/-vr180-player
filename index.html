@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v35</title>
+<title>VR180 SBS Player v36</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -23,6 +23,10 @@
 .vrhud button{font-size:13px;padding:9px 10px;white-space:nowrap}
 .vrhud .seekrow{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:11px}
 .vrhud input[type=range]{min-width:80px}
+.vrhud .fovrow{display:none;flex-basis:100%;align-items:center;gap:7px;font-size:11px}
+.vrhud.fovopen .fovrow{display:flex}
+.vrhud.fovopen .seekrow,.vrhud.fovopen button:not([data-act="fov"]):not([data-act="fovclose"]){display:none}
+.vrhud .fovrow input{flex:1;min-width:80px}
 #app.vr .panel{display:none}
 #app.vr .reticle.show{display:block}
 button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:11px 13px;font-size:14px;font-weight:650}.file input{display:none}button.on{background:#fff;color:#000}
@@ -41,12 +45,14 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 <canvas id="gl"></canvas>
 <div class="reticle" id="reticleL"></div><div class="reticle" id="reticleR"></div>
 <div class="vrhud" id="vrhudL">
-  <button data-act="play">▶ 再生</button><button data-act="reset">◎ 正面</button><button data-act="exit">×</button>
+  <button data-act="play">▶ 再生</button><button data-act="reset">◎ 正面</button><button data-act="fov">↔ FOV</button><button data-act="exit">×</button>
   <div class="seekrow"><span data-time>0:00</span><input data-seek type="range" min="0" max="1000" value="0"><span data-duration>0:00</span></div>
+  <div class="fovrow"><button data-act="fovclose">×</button><span>FOV</span><input data-fov type="range" min="55" max="90" value="71"><span data-fov-value>71°</span></div>
 </div>
 <div class="vrhud" id="vrhudR">
-  <button data-act="play">▶ 再生</button><button data-act="reset">◎ 正面</button><button data-act="exit">×</button>
+  <button data-act="play">▶ 再生</button><button data-act="reset">◎ 正面</button><button data-act="fov">↔ FOV</button><button data-act="exit">×</button>
   <div class="seekrow"><span data-time>0:00</span><input data-seek type="range" min="0" max="1000" value="0"><span data-duration>0:00</span></div>
+  <div class="fovrow"><button data-act="fovclose">×</button><span>FOV</span><input data-fov type="range" min="55" max="90" value="71"><span data-fov-value>71°</span></div>
 </div>
 <div class="panel" id="panel">
  <div class="row">
@@ -60,7 +66,7 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 </div></div>
 <script>
 'use strict';
-const BUILD='v35';
+const BUILD='v36';
 try{
   const k='vr180-build-seen';
   if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
@@ -76,7 +82,10 @@ const video=$('#video'),canvas=$('#gl'),fileEl=$('#file'),playBtn=$('#play'),gyr
 const seekEl=$('#seek'),timeEl=$('#time'),durationEl=$('#duration'),fovEl=$('#fov'),fovv=$('#fovv'),panel=$('#panel'),app=$('#app');
 const reticles=[...document.querySelectorAll('.reticle')],vrhuds=[...document.querySelectorAll('.vrhud')];
 const vrPlayBtns=[...document.querySelectorAll('[data-act="play"]')],vrResetBtns=[...document.querySelectorAll('[data-act="reset"]')],vrExitBtns=[...document.querySelectorAll('[data-act="exit"]')];
+const vrFovBtns=[...document.querySelectorAll('[data-act="fov"]')],vrFovCloseBtns=[...document.querySelectorAll('[data-act="fovclose"]')];
 const vrSeeks=[...document.querySelectorAll('[data-seek]')],vrTimes=[...document.querySelectorAll('[data-time]')],vrDurations=[...document.querySelectorAll('[data-duration]')];
+const vrFovs=[...document.querySelectorAll('[data-fov]')],vrFovValues=[...document.querySelectorAll('[data-fov-value]')];
+let viewFovDeg=71;
 const gl=canvas.getContext('webgl',{antialias:false,alpha:false});
 if(!gl) alert('この端末ではWebGLを利用できません。');
 const vs=`attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
@@ -85,7 +94,7 @@ const fs=`precision highp float;varying vec2 v;uniform sampler2D tex;uniform vec
 vec3 ray(vec2 uv){
  float eyeW=stereo>.5?res.x*.5:res.x;
  float asp=eyeW/res.y;
- float viewFov=radians(71.0);
+ float viewFov=radians(fov);
  float z=1.0/tan(viewFov*.5);
  vec2 q=vec2((uv.x*2.-1.)*asp,1.-uv.y*2.);
  vec3 d=normalize(vec3(q.x,q.y,-z));
@@ -126,15 +135,16 @@ let manualYaw=0,manualPitch=0,gyroYaw=0,gyroPitch=0,vrMode=false,lastURL=null,dr
 function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*d);canvas.height=Math.round(innerHeight*d);gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);
 if(window.visualViewport)visualViewport.addEventListener('resize',resize);
 addEventListener('orientationchange',()=>setTimeout(resize,250));resize();
-function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
+function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,viewFovDeg);gl.uniform1f(loc.stereo,vrMode?1:0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
 const fmt=s=>!isFinite(s)?'0:00':Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 fileEl.onchange=e=>{const f=e.target.files?.[0];if(!f)return;video.pause();if(lastURL)URL.revokeObjectURL(lastURL);lastURL=URL.createObjectURL(f);video.src=lastURL;video.playsInline=true;video.load();playBtn.textContent='▶ 再生'};
 playBtn.onclick=async()=>{if(!video.src){alert('先に動画を選択してください');return}try{if(video.paused){await video.play();playBtn.textContent='❚❚ 停止'}else{video.pause();playBtn.textContent='▶ 再生'}}catch(e){alert('Safariで動画を再生できません。動画のコーデックを確認してください。')}};
 video.onloadedmetadata=()=>durationEl.textContent=fmt(video.duration);video.ontimeupdate=()=>{timeEl.textContent=fmt(video.currentTime);seekEl.value=video.duration?video.currentTime/video.duration*1000:0};video.onended=()=>{playBtn.textContent='▶ 再生'};
-seekEl.oninput=()=>{if(video.duration)video.currentTime=seekEl.value/1000*video.duration};fovEl.oninput=()=>fovv.textContent=fovEl.value+'°';
+seekEl.oninput=()=>{if(video.duration)video.currentTime=seekEl.value/1000*video.duration};fovEl.value=viewFovDeg;fovv.textContent=viewFovDeg+'°';
+fovEl.oninput=()=>{viewFovDeg=+fovEl.value;fovv.textContent=viewFovDeg+'°';vrFovs.forEach(x=>x.value=viewFovDeg);vrFovValues.forEach(x=>x.textContent=viewFovDeg+'°')};
 function currentView(){return {yaw:manualYaw+gyroYaw,pitch:manualPitch+gyroPitch}}
 function hideVRPanel(){
- vrhuds.forEach(x=>x.classList.remove('show'));reticles.forEach(x=>x.classList.remove('show','aim'));
+ vrhuds.forEach(x=>{x.classList.remove('show','fovopen')});reticles.forEach(x=>x.classList.remove('show','aim'));
  gazeTarget=null;clearTimeout(gazeTimer);clearTimeout(uiTimer)
 }
 function showVRPanel(){
@@ -163,9 +173,15 @@ function activateVRAction(act){
    setTimeout(()=>vrResetBtns.forEach(b=>b.textContent='◎ 2…'),1000);
    setTimeout(()=>vrResetBtns.forEach(b=>b.textContent='◎ 1…'),2000);
    setTimeout(()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null;vrResetBtns.forEach(b=>b.textContent='◎ 正面');hideVRPanel()},3000);
+ }else if(act==='fov'){
+   vrhuds.forEach(h=>h.classList.add('fovopen'));
+   clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000);
+ }else if(act==='fovclose'){
+   vrhuds.forEach(h=>h.classList.remove('fovopen'));
+   clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000);
  }else if(act==='exit')setVRMode(false);
 }
-let seekArmed=false,seekTarget=null;
+let seekArmed=false,seekTarget=null,fovArmed=false,fovTarget=null;
 function gazeCheck(){
  updateVRHud();
  if(!vrMode||!vrhuds[0].classList.contains('show')){requestAnimationFrame(gazeCheck);return}
@@ -173,20 +189,21 @@ function gazeCheck(){
  let target=null,eye=-1;
  for(let i=0;i<2;i++){
    const el=document.elementFromPoint(points[i],innerHeight/2);
-   const t=el?.closest?.('.vrhud button,.vrhud [data-seek]');
+   const t=el?.closest?.('.vrhud button,.vrhud [data-seek],.vrhud [data-fov]');
    if(t){target=t;eye=i;break}
  }
  reticles.forEach((r,i)=>r.classList.toggle('aim',i===eye&&!!target));
 
  if(target!==gazeTarget){
    clearTimeout(gazeTimer);gazeTarget=target;
-   seekArmed=false;seekTarget=null;
+   seekArmed=false;seekTarget=null;fovArmed=false;fovTarget=null;
 
-   if(target?.matches('[data-seek]')){
+   if(target?.matches('[data-seek],[data-fov]')){
      const captured=target,capturedEye=eye;
      gazeTimer=setTimeout(()=>{
        if(gazeTarget===captured){
-         seekArmed=true;seekTarget=captured;
+         if(captured.matches('[data-seek]')){seekArmed=true;seekTarget=captured}
+         else{fovArmed=true;fovTarget=captured}
          reticles.forEach((r,i)=>r.classList.toggle('aim',i===capturedEye));
        }
      },1000);
@@ -211,6 +228,14 @@ function gazeCheck(){
    }
    clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000);
  }
+ if(target?.matches('[data-fov]') && fovArmed && fovTarget===target){
+   const r=target.getBoundingClientRect(),x=points[eye];
+   const ratio=Math.max(0,Math.min(1,(x-r.left)/r.width));
+   viewFovDeg=Math.round(55+ratio*(90-55));
+   vrFovs.forEach(v=>v.value=viewFovDeg);vrFovValues.forEach(v=>v.textContent=viewFovDeg+'°');
+   fovEl.value=viewFovDeg;fovv.textContent=viewFovDeg+'°';
+   clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000);
+ }
  requestAnimationFrame(gazeCheck)
 }
 gazeCheck();
@@ -224,7 +249,10 @@ vrBtn.onclick=()=>setVRMode(!vrMode);
 vrPlayBtns.forEach(b=>b.onclick=()=>activateVRAction('play'));
 vrResetBtns.forEach(b=>b.onclick=()=>activateVRAction('reset'));
 vrExitBtns.forEach(b=>b.onclick=()=>activateVRAction('exit'));
+vrFovBtns.forEach(b=>b.onclick=()=>activateVRAction('fov'));
+vrFovCloseBtns.forEach(b=>b.onclick=()=>activateVRAction('fovclose'));
 vrSeeks.forEach(x=>x.oninput=()=>{if(video.duration)video.currentTime=(+x.value/1000)*video.duration;clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000)});
+vrFovs.forEach(x=>x.oninput=()=>{viewFovDeg=+x.value;vrFovs.forEach(v=>v.value=viewFovDeg);vrFovValues.forEach(v=>v.textContent=viewFovDeg+'°');fovEl.value=viewFovDeg;fovv.textContent=viewFovDeg+'°'});
 
 function syncVRSeek(){
  const t=fmt(video.currentTime),d=fmt(video.duration),v=video.duration?(video.currentTime/video.duration*1000):0;
