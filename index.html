@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v15</title>
+<title>VR180 SBS Player v16</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -23,6 +23,9 @@
 #app.vr .reticle.show{display:block}
 button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:11px 13px;font-size:14px;font-weight:650}.file input{display:none}button.on{background:#fff;color:#000}
 #vr{background:#0a67ff}#vr.on{background:#fff;color:#000}input[type=range]{flex:1;min-width:110px}.hint{font-size:11px;color:#aaa;margin-top:8px;line-height:1.35}
+
+#app.vr{position:fixed;inset:0;width:100vw;height:100dvh;overflow:hidden;background:#000}
+#app.vr canvas{position:absolute;inset:0;width:100vw!important;height:100dvh!important;display:block}
 </style>
 </head>
 <body><div id="app">
@@ -81,7 +84,7 @@ const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(
 const loc={tex:gl.getUniformLocation(pr,'tex'),res:gl.getUniformLocation(pr,'res'),yaw:gl.getUniformLocation(pr,'yaw'),pitch:gl.getUniformLocation(pr,'pitch'),fov:gl.getUniformLocation(pr,'fov'),stereo:gl.getUniformLocation(pr,'stereo')};
 let manualYaw=0,manualPitch=0,gyroYaw=0,gyroPitch=0,vrMode=false,lastURL=null,drag=false,lx=0,ly=0,baseQ=null,gyroActive=false,lastA=0,lastB=0,lastG=0,uiTimer=null,gazeTimer=null,gazeTarget=null,hudYaw=0,hudPitch=0;
 function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*d);canvas.height=Math.round(innerHeight*d);gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,150));resize();
-function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,vrMode?Math.min(+fovEl.value,92):+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.uniform1f(loc.conv,0.0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
+function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.uniform1f(loc.conv,0.0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
 const fmt=s=>!isFinite(s)?'0:00':Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 fileEl.onchange=e=>{const f=e.target.files?.[0];if(!f)return;video.pause();if(lastURL)URL.revokeObjectURL(lastURL);lastURL=URL.createObjectURL(f);video.src=lastURL;video.playsInline=true;video.load();playBtn.textContent='▶ 再生'};
 playBtn.onclick=async()=>{if(!video.src){alert('先に動画を選択してください');return}try{if(video.paused){await video.play();playBtn.textContent='❚❚ 停止'}else{video.pause();playBtn.textContent='▶ 再生'}}catch(e){alert('Safariで動画を再生できません。動画のコーデックを確認してください。')}};
