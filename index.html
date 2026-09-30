@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v22</title>
+<title>VR180 SBS Player v23</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -58,7 +58,7 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 </div></div>
 <script>
 'use strict';
-const BUILD='v22';
+const BUILD='v23';
 try{
   const k='vr180-build-seen';
   if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
@@ -98,7 +98,7 @@ vec2 vr180map(vec3 d,float eye){
  float localX=.5+lon/span;
  float localY=.5+lat/PI;
  float stereoCal=0.010;
- localX += eye<.5?stereoCal:-stereoCal;
+ localX += eye<.5?-stereoCal:stereoCal;
  float base=eye<.5?0.:.5;
  return vec2(base+localX*.5,localY);
 }
