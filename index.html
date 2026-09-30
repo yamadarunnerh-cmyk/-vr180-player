@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v32</title>
+<title>VR180 SBS Player v33</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -60,7 +60,7 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 </div></div>
 <script>
 'use strict';
-const BUILD='v32';
+const BUILD='v33';
 try{
   const k='vr180-build-seen';
   if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
@@ -146,7 +146,12 @@ function showVRPanel(){
 }
 function updateVRHud(){
  if(!vrMode||!vrhuds[0].classList.contains('show'))return;
- vrhuds.forEach(h=>h.style.transform='translate(-50%,-50%)');
+ const v=currentView();let dy=hudYaw-v.yaw,dp=hudPitch-v.pitch;
+ while(dy>Math.PI)dy-=Math.PI*2;while(dy<-Math.PI)dy+=Math.PI*2;
+ const scale=innerWidth/1.25;
+ // UI is anchored where it appeared. The reticles stay at the optical centers,
+ // so moving the head moves the UI across the fixed gaze points.
+ vrhuds.forEach(h=>h.style.transform=`translate(calc(-50% + ${dy*scale*.5}px),calc(-50% + ${dp*scale}px))`);
 }
 function activateVRAction(act){
  if(act==='play'){
