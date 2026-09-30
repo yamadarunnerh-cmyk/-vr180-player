@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v19</title>
+<title>VR180 SBS Player v20</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -58,7 +58,7 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 </div></div>
 <script>
 'use strict';
-const BUILD='v19';
+const BUILD='v20';
 try{
   const k='vr180-build-seen';
   if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
@@ -77,8 +77,17 @@ if(!gl) alert('この端末ではWebGLを利用できません。');
 const vs=`attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
 const fs=`precision highp float;varying vec2 v;uniform sampler2D tex;uniform vec2 res;uniform float yaw,pitch,fov,stereo;
 #define PI 3.141592653589793
-vec3 ray(vec2 uv){float eyeW=stereo>.5?res.x*.5:res.x;float asp=eyeW/res.y;float vf=1.08;vec2 q=vec2((uv.x*2.-1.)*asp,(uv.y*2.-1.))*vf;vec3 d=normalize(vec3(q.x,-q.y,-1.));float cy=cos(yaw),sy=sin(yaw),cp=cos(pitch),sp=sin(pitch);d=vec3(cy*d.x+sy*d.z,d.y,-sy*d.x+cy*d.z);d=vec3(d.x,cp*d.y-sp*d.z,sp*d.y+cp*d.z);return d;}
-vec2 fish(vec3 d,float eye){float theta=acos(clamp(-d.z,-1.,1.));float maxa=radians(fov*.5);if(theta>maxa)return vec2(-1.);float phi=atan(d.y,d.x);float r=.5*theta/maxa;vec2 c=vec2(eye<.5?.25:.75,.5);return c+r*vec2(cos(phi)*.5,sin(phi));}
+vec3 ray(vec2 uv){float eyeW=stereo>.5?res.x*.5:res.x;float asp=eyeW/res.y;float vf=1.00;vec2 q=vec2((uv.x*2.-1.)*asp,(uv.y*2.-1.))*vf;vec3 d=normalize(vec3(q.x,-q.y,-1.));float cy=cos(yaw),sy=sin(yaw),cp=cos(pitch),sp=sin(pitch);d=vec3(cy*d.x+sy*d.z,d.y,-sy*d.x+cy*d.z);d=vec3(d.x,cp*d.y-sp*d.z,sp*d.y+cp*d.z);return d;}
+vec2 fish(vec3 d,float eye){
+ float theta=acos(clamp(-d.z,-1.,1.));
+ float maxa=radians(fov*.5);
+ if(theta>maxa)return vec2(-1.);
+ float phi=atan(d.y,d.x);
+ float rn=sin(theta*.5)/max(.0001,sin(maxa*.5));
+ rn=rn*(1.0-0.035*rn*rn);
+ vec2 c=vec2(eye<.5?.25:.75,.5);
+ return c+vec2(cos(phi)*rn*.25,sin(phi)*rn*.5);
+}
 void main(){bool right=stereo>.5&&v.x>.5;vec2 uv=v;if(stereo>.5)uv.x=fract(v.x*2.);vec3 d=ray(uv);vec2 t=fish(d,right?1.:0.);if(t.x<0.||t.x>1.||t.y<0.||t.y>1.)gl_FragColor=vec4(0,0,0,1);else gl_FragColor=texture2D(tex,t);}`;
 function sh(t,s){let x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(x);return x}
 const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
