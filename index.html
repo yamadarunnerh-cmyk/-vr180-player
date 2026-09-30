@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v14</title>
+<title>VR180 SBS Player v15</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -51,26 +51,37 @@ button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:1
 </div></div>
 <script>
 'use strict';
+const BUILD='v15';
+try{
+  const k='vr180-build-seen';
+  if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
+     sessionStorage.getItem(k)!==BUILD &&
+     !location.search.includes('build='+BUILD)){
+    sessionStorage.setItem(k,BUILD);
+    const u=new URL(location.href);u.searchParams.set('build',BUILD);
+    location.replace(u.toString());
+  }
+}catch(e){}
 const $=s=>document.querySelector(s);
 const video=$('#video'),canvas=$('#gl'),fileEl=$('#file'),playBtn=$('#play'),gyroBtn=$('#gyro'),vrBtn=$('#vr'),resetBtn=$('#reset');
 const seekEl=$('#seek'),timeEl=$('#time'),durationEl=$('#duration'),fovEl=$('#fov'),fovv=$('#fovv'),panel=$('#panel'),app=$('#app'),reticle=$('#reticle'),vrhud=$('#vrhud'),vrPlay=$('#vrPlay'),vrReset=$('#vrReset'),vrExit=$('#vrExit'),vrSeek=$('#vrSeek'),vrTime=$('#vrTime'),vrDuration=$('#vrDuration');
 const gl=canvas.getContext('webgl',{antialias:false,alpha:false});
 if(!gl) alert('この端末ではWebGLを利用できません。');
 const vs=`attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
-const fs=`precision highp float;varying vec2 v;uniform sampler2D tex;uniform vec2 res;uniform float yaw,pitch,fov,stereo,conv;
+const fs=`precision highp float;varying vec2 v;uniform sampler2D tex;uniform vec2 res;uniform float yaw,pitch,fov,stereo;
 #define PI 3.141592653589793
 vec3 ray(vec2 uv){float eyeW=stereo>.5?res.x*.5:res.x;float asp=eyeW/res.y;float vf=1.25;vec2 q=(uv*2.-1.)*vec2(asp,1.)*vf;vec3 d=normalize(vec3(q.x,-q.y,-1.));float cy=cos(yaw),sy=sin(yaw),cp=cos(pitch),sp=sin(pitch);d=vec3(cy*d.x+sy*d.z,d.y,-sy*d.x+cy*d.z);d=vec3(d.x,cp*d.y-sp*d.z,sp*d.y+cp*d.z);return d;}
 vec2 fish(vec3 d,float eye){float theta=acos(clamp(-d.z,-1.,1.));float maxa=radians(fov*.5);if(theta>maxa)return vec2(-1.);float phi=atan(d.y,d.x);float r=.5*theta/maxa;vec2 c=vec2(eye<.5?.25:.75,.5);return c+r*vec2(cos(phi)*.5,sin(phi));}
-void main(){bool right=stereo>.5&&v.x>.5;vec2 uv=v;if(stereo>.5)uv.x=fract(v.x*2.);vec3 d=ray(uv);vec2 t=fish(d,right?1.:0.);if(stereo>.5)t.x+=(right?-conv:conv);if(t.x<0.||t.x>1.||t.y<0.||t.y>1.)gl_FragColor=vec4(0,0,0,1);else gl_FragColor=texture2D(tex,t);}`;
+void main(){bool right=stereo>.5&&v.x>.5;vec2 uv=v;if(stereo>.5)uv.x=fract(v.x*2.);vec3 d=ray(uv);vec2 t=fish(d,right?1.:0.);if(t.x<0.||t.x>1.||t.y<0.||t.y>1.)gl_FragColor=vec4(0,0,0,1);else gl_FragColor=texture2D(tex,t);}`;
 function sh(t,s){let x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(x);return x}
 const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
 const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
 const ap=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(ap);gl.vertexAttribPointer(ap,2,gl.FLOAT,false,0,0);
 const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-const loc={tex:gl.getUniformLocation(pr,'tex'),res:gl.getUniformLocation(pr,'res'),yaw:gl.getUniformLocation(pr,'yaw'),pitch:gl.getUniformLocation(pr,'pitch'),fov:gl.getUniformLocation(pr,'fov'),stereo:gl.getUniformLocation(pr,'stereo'),conv:gl.getUniformLocation(pr,'conv')};
+const loc={tex:gl.getUniformLocation(pr,'tex'),res:gl.getUniformLocation(pr,'res'),yaw:gl.getUniformLocation(pr,'yaw'),pitch:gl.getUniformLocation(pr,'pitch'),fov:gl.getUniformLocation(pr,'fov'),stereo:gl.getUniformLocation(pr,'stereo')};
 let manualYaw=0,manualPitch=0,gyroYaw=0,gyroPitch=0,vrMode=false,lastURL=null,drag=false,lx=0,ly=0,baseQ=null,gyroActive=false,lastA=0,lastB=0,lastG=0,uiTimer=null,gazeTimer=null,gazeTarget=null,hudYaw=0,hudPitch=0;
 function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*d);canvas.height=Math.round(innerHeight*d);gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,150));resize();
-function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.uniform1f(loc.conv,0.012);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
+function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,vrMode?Math.min(+fovEl.value,92):+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.uniform1f(loc.conv,0.0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
 const fmt=s=>!isFinite(s)?'0:00':Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 fileEl.onchange=e=>{const f=e.target.files?.[0];if(!f)return;video.pause();if(lastURL)URL.revokeObjectURL(lastURL);lastURL=URL.createObjectURL(f);video.src=lastURL;video.playsInline=true;video.load();playBtn.textContent='▶ 再生'};
 playBtn.onclick=async()=>{if(!video.src){alert('先に動画を選択してください');return}try{if(video.paused){await video.play();playBtn.textContent='❚❚ 停止'}else{video.pause();playBtn.textContent='▶ 再生'}}catch(e){alert('Safariで動画を再生できません。動画のコーデックを確認してください。')}};
