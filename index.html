@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v10</title>
+<title>VR180 SBS Player v11</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -31,7 +31,7 @@ button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:1
 <div class="reticle" id="reticle"></div>
 <div class="vrhud" id="vrhud">
   <button id="vrPlay">▶ 再生</button>
-  <button id="vrReset">◎ 正面 5秒</button>
+  <button id="vrReset">◎ 正面</button>
   <button id="vrExit">✓ VR解除</button>
   <div style="flex-basis:100%;display:flex;align-items:center;gap:8px">
     <span id="vrTime">0:00</span>
@@ -102,7 +102,7 @@ function gazeCheck(){
  const target=el?.closest?.('#vrhud button,#vrSeek');
  if(target!==gazeTarget){
   clearTimeout(gazeTimer);gazeTarget=target;reticle.classList.toggle('aim',!!target);
-  if(target){const dwell=target===vrReset?5000:900;gazeTimer=setTimeout(()=>{target.click();gazeTarget=null;reticle.classList.remove('aim')},dwell)}
+  if(target && target!==vrSeek){const dwell=1000;gazeTimer=setTimeout(()=>{target.click();gazeTarget=null;reticle.classList.remove('aim')},dwell)}
  }
  requestAnimationFrame(gazeCheck)
 }
