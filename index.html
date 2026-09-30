@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v34</title>
+<title>VR180 SBS Player v35</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -60,7 +60,7 @@ html,body,#app{margin:0!important;padding:0!important;width:100%!important;heigh
 </div></div>
 <script>
 'use strict';
-const BUILD='v34';
+const BUILD='v35';
 try{
   const k='vr180-build-seen';
   if((navigator.standalone||matchMedia('(display-mode: standalone)').matches) &&
@@ -165,6 +165,7 @@ function activateVRAction(act){
    setTimeout(()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null;vrResetBtns.forEach(b=>b.textContent='◎ 正面');hideVRPanel()},3000);
  }else if(act==='exit')setVRMode(false);
 }
+let seekArmed=false,seekTarget=null;
 function gazeCheck(){
  updateVRHud();
  if(!vrMode||!vrhuds[0].classList.contains('show')){requestAnimationFrame(gazeCheck);return}
@@ -176,17 +177,38 @@ function gazeCheck(){
    if(t){target=t;eye=i;break}
  }
  reticles.forEach((r,i)=>r.classList.toggle('aim',i===eye&&!!target));
+
  if(target!==gazeTarget){
-  clearTimeout(gazeTimer);gazeTarget=target;
-  if(target && !target.matches('[data-seek]')){
-    const act=target.dataset.act;
-    gazeTimer=setTimeout(()=>{activateVRAction(act);gazeTarget=null;reticles.forEach(r=>r.classList.remove('aim'))},1000)
-  }
+   clearTimeout(gazeTimer);gazeTarget=target;
+   seekArmed=false;seekTarget=null;
+
+   if(target?.matches('[data-seek]')){
+     const captured=target,capturedEye=eye;
+     gazeTimer=setTimeout(()=>{
+       if(gazeTarget===captured){
+         seekArmed=true;seekTarget=captured;
+         reticles.forEach((r,i)=>r.classList.toggle('aim',i===capturedEye));
+       }
+     },1000);
+   }else if(target){
+     const captured=target,act=target.dataset.act;
+     gazeTimer=setTimeout(()=>{
+       if(gazeTarget===captured){
+         activateVRAction(act);gazeTarget=null;
+         reticles.forEach(r=>r.classList.remove('aim'));
+       }
+     },1000);
+   }
  }
- if(target?.matches('[data-seek]') && video.duration){
+
+ if(target?.matches('[data-seek]') && seekArmed && seekTarget===target && video.duration){
    const r=target.getBoundingClientRect(),x=points[eye];
    const ratio=Math.max(0,Math.min(1,(x-r.left)/r.width));
-   video.currentTime=ratio*video.duration;syncVRSeek();
+   const wanted=ratio*video.duration;
+   if(Math.abs(video.currentTime-wanted)>.45){
+     video.currentTime=wanted;
+     syncVRSeek();
+   }
    clearTimeout(uiTimer);uiTimer=setTimeout(hideVRPanel,8000);
  }
  requestAnimationFrame(gazeCheck)
@@ -208,6 +230,14 @@ function syncVRSeek(){
  const t=fmt(video.currentTime),d=fmt(video.duration),v=video.duration?(video.currentTime/video.duration*1000):0;
  vrTimes.forEach(x=>x.textContent=t);vrDurations.forEach(x=>x.textContent=d);vrSeeks.forEach(x=>x.value=v);
 }
+let seekWasPlaying=false;
+video.addEventListener('seeking',()=>{seekWasPlaying=!video.paused});
+video.addEventListener('seeked',()=>{
+ if(seekWasPlaying){
+   const pr=video.play();
+   if(pr&&pr.catch)pr.catch(()=>{});
+ }
+});
 video.addEventListener('timeupdate',syncVRSeek);
 video.addEventListener('loadedmetadata',syncVRSeek);
 
