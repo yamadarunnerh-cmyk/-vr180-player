@@ -1,41 +1,83 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>VR180 SBS Player v3</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}#app{width:100%;height:100%;position:relative}canvas{display:block;width:100%;height:100%;touch-action:none}.panel{position:absolute;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));padding:12px;background:#000b;border:1px solid #ffffff2b;border-radius:16px;backdrop-filter:blur(10px);transition:.2s}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}button,.file{border:0;border-radius:11px;background:#222;color:#fff;padding:11px 14px;font-size:14px;font-weight:600}.file input{display:none}button.on{background:#fff;color:#000}input[type=range]{flex:1;min-width:120px}.hint{font-size:12px;color:#aaa;margin-top:9px;line-height:1.4}.top{position:absolute;top:max(10px,env(safe-area-inset-top));left:12px;padding:8px 10px;background:#0009;border-radius:10px;font-size:12px}.hidden{opacity:0;pointer-events:none}video{display:none}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
+#app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
+.top{position:absolute;top:max(8px,env(safe-area-inset-top));left:10px;padding:7px 9px;background:#000b;border-radius:9px;font-size:11px;z-index:3}
+.debug{position:absolute;top:max(8px,env(safe-area-inset-top));right:10px;padding:7px 9px;background:#000b;border-radius:9px;font:11px ui-monospace,monospace;z-index:3;text-align:right}
+.panel{position:absolute;z-index:4;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));padding:11px;background:#000c;border:1px solid #ffffff2b;border-radius:15px;backdrop-filter:blur(10px);transition:.2s}
+.panel.hidden{opacity:0;pointer-events:none}.row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:11px 13px;font-size:14px;font-weight:650}.file input{display:none}button.on{background:#fff;color:#000}
+#vr{background:#0a67ff}#vr.on{background:#fff;color:#000}input[type=range]{flex:1;min-width:110px}.hint{font-size:11px;color:#aaa;margin-top:8px;line-height:1.35}
 </style>
-</head><body><div id="app"><video id="video" playsinline webkit-playsinline preload="metadata"></video><canvas id="gl"></canvas><div class="top">VR180 SBS • Fisheye</div><div class="panel" id="panel"><div class="row"><label class="file">動画を選択<input id="file" type="file" accept="video/*"></label><button id="play">▶ 再生</button><button id="gyro">ジャイロ</button><button id="vr">VRモード</button><button id="reset">正面</button></div><div class="row" style="margin-top:10px"><span id="time">0:00</span><input id="seek" type="range" min="0" max="1000" value="0"><span id="duration">0:00</span></div><div class="row" style="margin-top:8px"><span>FOV</span><input id="fov" type="range" min="150" max="210" value="180"><span id="fovv">180°</span></div><div class="hint">VR180 SBS専用。iPhoneは横向き推奨。ジャイロON後に「正面」で向きを合わせてください。FOVは映像が自然に見える値へ調整できます。</div></div></div>
+</head>
+<body><div id="app">
+<video id="video" playsinline webkit-playsinline preload="metadata"></video>
+<canvas id="gl"></canvas>
+<div class="top">VR180 SBS • Fisheye • v3</div>
+<div class="debug" id="debug">GYRO OFF</div>
+<div class="panel" id="panel">
+ <div class="row">
+  <label class="file">動画を選択<input id="file" type="file" accept="video/*"></label>
+  <button id="play">▶ 再生</button><button id="gyro">ジャイロ</button>
+  <button id="vr">🥽 VRモード</button><button id="reset">正面リセット</button>
+ </div>
+ <div class="row" style="margin-top:9px"><span id="time">0:00</span><input id="seek" type="range" min="0" max="1000" value="0"><span id="duration">0:00</span></div>
+ <div class="row" style="margin-top:7px"><span>FOV</span><input id="fov" type="range" min="150" max="210" value="180"><span id="fovv">180°</span></div>
+ <div class="hint">iPhoneを横向きにして「ジャイロ」→「正面リセット」。VRモードはSafariのFullscreen APIに依存せず、必ず左右2眼描画へ切り替えます。</div>
+</div></div>
 <script>
-const video=document.querySelector('#video'), canvas=document.querySelector('#gl');
+'use strict';
+const $=s=>document.querySelector(s);
+const video=$('#video'),canvas=$('#gl'),fileEl=$('#file'),playBtn=$('#play'),gyroBtn=$('#gyro'),vrBtn=$('#vr'),resetBtn=$('#reset');
+const seekEl=$('#seek'),timeEl=$('#time'),durationEl=$('#duration'),fovEl=$('#fov'),fovv=$('#fovv'),panel=$('#panel'),debugEl=$('#debug');
 const gl=canvas.getContext('webgl',{antialias:false,alpha:false});
-if(!gl) alert('WebGLを利用できません');
-const vs=`attribute vec2 p; varying vec2 v; void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
-const fs=`precision highp float; varying vec2 v; uniform sampler2D tex; uniform vec2 res; uniform float yaw,pitch,fov; uniform float stereo;
+if(!gl) alert('この端末ではWebGLを利用できません。');
+const vs=`attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
+const fs=`precision highp float;varying vec2 v;uniform sampler2D tex;uniform vec2 res;uniform float yaw,pitch,fov,stereo;
 #define PI 3.141592653589793
-vec3 ray(vec2 uv){float asp=(res.x/(1.0+stereo))/res.y;float vf=1.72;vec2 q=(uv*2.-1.)*vec2(asp,1.)*vf;vec3 d=normalize(vec3(q.x,-q.y,-1.));float cy=cos(yaw),sy=sin(yaw),cp=cos(pitch),sp=sin(pitch);d=vec3(cy*d.x+sy*d.z,d.y,-sy*d.x+cy*d.z);d=vec3(d.x,cp*d.y-sp*d.z,sp*d.y+cp*d.z);return d;}
+vec3 ray(vec2 uv){float eyeW=stereo>.5?res.x*.5:res.x;float asp=eyeW/res.y;float vf=1.25;vec2 q=(uv*2.-1.)*vec2(asp,1.)*vf;vec3 d=normalize(vec3(q.x,-q.y,-1.));float cy=cos(yaw),sy=sin(yaw),cp=cos(pitch),sp=sin(pitch);d=vec3(cy*d.x+sy*d.z,d.y,-sy*d.x+cy*d.z);d=vec3(d.x,cp*d.y-sp*d.z,sp*d.y+cp*d.z);return d;}
 vec2 fish(vec3 d,float eye){float theta=acos(clamp(-d.z,-1.,1.));float maxa=radians(fov*.5);if(theta>maxa)return vec2(-1.);float phi=atan(d.y,d.x);float r=.5*theta/maxa;vec2 c=vec2(eye<.5?.25:.75,.5);return c+r*vec2(cos(phi)*.5,sin(phi));}
 void main(){bool right=stereo>.5&&v.x>.5;vec2 uv=v;if(stereo>.5)uv.x=fract(v.x*2.);vec3 d=ray(uv);vec2 t=fish(d,right?1.:0.);if(t.x<0.||t.x>1.||t.y<0.||t.y>1.)gl_FragColor=vec4(0,0,0,1);else gl_FragColor=texture2D(tex,t);}`;
-function shader(type,src){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s}let pr=gl.createProgram();gl.attachShader(pr,shader(gl.VERTEX_SHADER,vs));gl.attachShader(pr,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
-let b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);let a=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
-let tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-let yaw=0,pitch=0,gyroYaw=0,gyroPitch=0,baseOri=null,vrMode=false,drag=false,lx=0,ly=0,lastObjectURL=null;
-const U=n=>gl.getUniformLocation(pr,n);function resize(){let d=Math.min(devicePixelRatio,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);resize();
-function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(U('tex'),0);gl.uniform2f(U('res'),canvas.width,canvas.height);gl.uniform1f(U('yaw'),yaw+gyroYaw);gl.uniform1f(U('pitch'),Math.max(-1.45,Math.min(1.45,pitch+gyroPitch)));gl.uniform1f(U('fov'),+document.querySelector('#fov').value);gl.uniform1f(U('stereo'),vrMode?1:0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
-function fmt(s){if(!isFinite(s))return'0:00';return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
-file.onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;video.pause();if(lastObjectURL)URL.revokeObjectURL(lastObjectURL);lastObjectURL=URL.createObjectURL(f);video.removeAttribute('src');video.load();video.src=lastObjectURL;video.muted=false;video.playsInline=true;video.load();play.textContent='▶ 再生'};play.onclick=async()=>{if(!video.src){alert('先に動画を選択してください');return}try{if(video.paused){await video.play();play.textContent='❚❚ 停止'}else{video.pause();play.textContent='▶ 再生'}}catch(e){alert('この動画をSafariで再生できません。MP4(H.264/HEVC)などiPhone対応形式か確認してください。')}};video.onloadedmetadata=()=>{duration.textContent=fmt(video.duration);play.textContent='▶ 再生'};video.onerror=()=>alert('動画を読み込めませんでした。iPhone/Safari対応の動画形式か確認してください。');video.onended=()=>play.textContent='▶ 再生';video.ontimeupdate=()=>{time.textContent=fmt(video.currentTime);seek.value=video.duration?video.currentTime/video.duration*1000:0};seek.oninput=()=>{if(video.duration)video.currentTime=seek.value/1000*video.duration};
-fov.oninput=()=>fovv.textContent=fov.value+'°';const vrBtn=document.querySelector('#vr');vrBtn.onclick=async()=>{vrMode=!vrMode;vrBtn.classList.toggle('on',vrMode);vrBtn.textContent=vrMode?'VR解除':'VRモード';try{if(vrMode&&screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape')}catch(e){};if(vrMode&&document.documentElement.requestFullscreen)try{await document.documentElement.requestFullscreen()}catch(e){}};reset.onclick=()=>{yaw=pitch=gyroYaw=gyroPitch=0;baseOri=null};
-canvas.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY});canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-lx)*.005;pitch-=(e.clientY-ly)*.005;lx=e.clientX;ly=e.clientY});addEventListener('pointerup',()=>drag=false);
-function quatMul(a,b){return [a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]]}
-function qAxis(x,y,z,a){let h=a/2,s=Math.sin(h);return [Math.cos(h),x*s,y*s,z*s]}
-function qRotate(q,v){let p=[0,v[0],v[1],v[2]],qc=[q[0],-q[1],-q[2],-q[3]],r=quatMul(quatMul(q,p),qc);return [r[1],r[2],r[3]]}
-function deviceForward(e){let d=Math.PI/180,a=(e.alpha||0)*d,b=(e.beta||0)*d,g=(e.gamma||0)*d;let q=quatMul(quatMul(qAxis(0,1,0,a),qAxis(1,0,0,b)),qAxis(0,0,1,-g));q=quatMul(q,qAxis(1,0,0,-Math.PI/2));let angle=((screen.orientation&&screen.orientation.angle)||window.orientation||0)*d;q=quatMul(q,qAxis(0,0,1,-angle));return qRotate(q,[0,0,-1])}
-function anglesFromForward(v){return {y:Math.atan2(v[0],-v[2]),p:Math.atan2(v[1],Math.hypot(v[0],v[2]))}}
-function wrap(a){while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;return a}
-async function enableGyro(){if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){let r=await DeviceOrientationEvent.requestPermission();if(r!=='granted')throw 0}removeEventListener('deviceorientation',orient,true);addEventListener('deviceorientation',orient,true);gyro.classList.add('on');gyro.textContent='ジャイロON'}
-function orient(e){if(e.alpha==null)return;let a=anglesFromForward(deviceForward(e));if(!baseOri){baseOri=a;return}gyroYaw=wrap(a.y-baseOri.y);gyroPitch=a.p-baseOri.p}
-gyro.onclick=()=>enableGyro().catch(()=>alert('設定 → Safari → モーションと画面の向きのアクセスも確認してください。'));
-let panel=document.querySelector('#panel'),last=0;canvas.onclick=()=>{let n=Date.now();if(n-last>250)panel.classList.toggle('hidden');last=n};
+function sh(t,s){let x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(x);return x}
+const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
+const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+const ap=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(ap);gl.vertexAttribPointer(ap,2,gl.FLOAT,false,0,0);
+const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+const loc={tex:gl.getUniformLocation(pr,'tex'),res:gl.getUniformLocation(pr,'res'),yaw:gl.getUniformLocation(pr,'yaw'),pitch:gl.getUniformLocation(pr,'pitch'),fov:gl.getUniformLocation(pr,'fov'),stereo:gl.getUniformLocation(pr,'stereo')};
+let manualYaw=0,manualPitch=0,gyroYaw=0,gyroPitch=0,vrMode=false,lastURL=null,drag=false,lx=0,ly=0,baseQ=null,gyroActive=false,lastA=0,lastB=0,lastG=0;
+function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*d);canvas.height=Math.round(innerHeight*d);gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,150));resize();
+function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
+const fmt=s=>!isFinite(s)?'0:00':Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+fileEl.onchange=e=>{const f=e.target.files?.[0];if(!f)return;video.pause();if(lastURL)URL.revokeObjectURL(lastURL);lastURL=URL.createObjectURL(f);video.src=lastURL;video.playsInline=true;video.load();playBtn.textContent='▶ 再生'};
+playBtn.onclick=async()=>{if(!video.src){alert('先に動画を選択してください');return}try{if(video.paused){await video.play();playBtn.textContent='❚❚ 停止'}else{video.pause();playBtn.textContent='▶ 再生'}}catch(e){alert('Safariで動画を再生できません。動画のコーデックを確認してください。')}};
+video.onloadedmetadata=()=>durationEl.textContent=fmt(video.duration);video.ontimeupdate=()=>{timeEl.textContent=fmt(video.currentTime);seekEl.value=video.duration?video.currentTime/video.duration*1000:0};video.onended=()=>playBtn.textContent='▶ 再生';
+seekEl.oninput=()=>{if(video.duration)video.currentTime=seekEl.value/1000*video.duration};fovEl.oninput=()=>fovv.textContent=fovEl.value+'°';
+vrBtn.onclick=()=>{vrMode=!vrMode;vrBtn.classList.toggle('on',vrMode);vrBtn.textContent=vrMode?'✓ VR解除':'🥽 VRモード';panel.classList.toggle('hidden',vrMode);setTimeout(resize,50)};
+resetBtn.onclick=()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null;debugEl.textContent=gyroActive?'RESET…':'GYRO OFF'};
+canvas.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY});
+canvas.addEventListener('pointermove',e=>{if(!drag)return;manualYaw+=(e.clientX-lx)*.005;manualPitch+=(e.clientY-ly)*.005;lx=e.clientX;ly=e.clientY});
+addEventListener('pointerup',()=>drag=false);canvas.addEventListener('dblclick',()=>panel.classList.toggle('hidden'));
+
+/* DeviceOrientation: W3C/three.js型の Z-X'-Y'' を quaternion 化し、初期姿勢との差分から視線ベクトルを取得 */
+const mul=(a,b)=>[a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]];
+const axis=(x,y,z,a)=>{const h=a/2,s=Math.sin(h);return[Math.cos(h),x*s,y*s,z*s]};
+const inv=q=>[q[0],-q[1],-q[2],-q[3]];
+function rotate(q,v){const r=mul(mul(q,[0,...v]),inv(q));return[r[1],r[2],r[3]]}
+function deviceQ(e){const d=Math.PI/180,alpha=(e.alpha||0)*d,beta=(e.beta||0)*d,gamma=(e.gamma||0)*d;let q=mul(mul(axis(0,1,0,alpha),axis(1,0,0,beta)),axis(0,0,1,-gamma));q=mul(q,axis(1,0,0,-Math.PI/2));const so=((screen.orientation?.angle ?? window.orientation ?? 0)*d);q=mul(q,axis(0,0,1,-so));return q}
+function orient(e){if(e.alpha==null)return;lastA=e.alpha||0;lastB=e.beta||0;lastG=e.gamma||0;const q=deviceQ(e);if(!baseQ){baseQ=q;return}
+ const rel=mul(inv(baseQ),q),f=rotate(rel,[0,0,-1]);
+ // 視線方向そのものを使う。左右は画面の向きと一致、上下も独立して反映。
+ gyroYaw=-Math.atan2(f[0],-f[2]);
+ gyroPitch=Math.atan2(f[1],Math.hypot(f[0],f[2]));
+ debugEl.textContent=`Y ${Math.round(gyroYaw*57.3)}°  P ${Math.round(gyroPitch*57.3)}°\nα${Math.round(lastA)} β${Math.round(lastB)} γ${Math.round(lastG)}`;
+}
+async function enableGyro(){try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted')throw new Error()}removeEventListener('deviceorientation',orient,true);addEventListener('deviceorientation',orient,true);gyroActive=true;baseQ=null;gyroBtn.classList.add('on');gyroBtn.textContent='✓ ジャイロON';debugEl.textContent='RESET…'}catch(e){alert('モーションセンサーを許可できませんでした。Safariのサイト設定も確認してください。')}}
+gyroBtn.onclick=enableGyro;
 </script></body></html>
