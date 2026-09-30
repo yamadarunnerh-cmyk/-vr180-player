@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>VR180 SBS Player v5</title>
+<title>VR180 SBS Player v6</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%}canvas{display:block;width:100%;height:100%;touch-action:none}video{display:none}
@@ -20,8 +20,7 @@ button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:1
 <body><div id="app">
 <video id="video" playsinline webkit-playsinline preload="metadata"></video>
 <canvas id="gl"></canvas>
-<div class="top">VR180 SBS • Fisheye • v5</div>
-<div class="debug" id="debug">v5 • GYRO OFF</div>
+<div class="debug" id="debug">v6 • GYRO OFF</div>
 <div class="panel" id="panel">
  <div class="row">
   <label class="file">動画を選択<input id="file" type="file" accept="video/*"></label>
@@ -36,7 +35,7 @@ button,.file{border:0;border-radius:10px;background:#252525;color:#fff;padding:1
 'use strict';
 const $=s=>document.querySelector(s);
 const video=$('#video'),canvas=$('#gl'),fileEl=$('#file'),playBtn=$('#play'),gyroBtn=$('#gyro'),vrBtn=$('#vr'),resetBtn=$('#reset');
-const seekEl=$('#seek'),timeEl=$('#time'),durationEl=$('#duration'),fovEl=$('#fov'),fovv=$('#fovv'),panel=$('#panel'),debugEl=$('#debug'),topLabel=$('.top');
+const seekEl=$('#seek'),timeEl=$('#time'),durationEl=$('#duration'),fovEl=$('#fov'),fovv=$('#fovv'),panel=$('#panel'),debugEl=$('#debug');
 const gl=canvas.getContext('webgl',{antialias:false,alpha:false});
 if(!gl) alert('この端末ではWebGLを利用できません。');
 const vs=`attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
@@ -53,14 +52,14 @@ const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(
 const loc={tex:gl.getUniformLocation(pr,'tex'),res:gl.getUniformLocation(pr,'res'),yaw:gl.getUniformLocation(pr,'yaw'),pitch:gl.getUniformLocation(pr,'pitch'),fov:gl.getUniformLocation(pr,'fov'),stereo:gl.getUniformLocation(pr,'stereo')};
 let manualYaw=0,manualPitch=0,gyroYaw=0,gyroPitch=0,vrMode=false,lastURL=null,drag=false,lx=0,ly=0,baseQ=null,gyroActive=false,lastA=0,lastB=0,lastG=0;
 function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(innerWidth*d);canvas.height=Math.round(innerHeight*d);gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,150));resize();
-function draw(){topLabel.style.display=(!video.paused && !video.ended && video.readyState>=2)?'none':'';if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
+function draw(){if(video.readyState>=2){gl.bindTexture(gl.TEXTURE_2D,tex);try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video)}catch(e){}}gl.uniform1i(loc.tex,0);gl.uniform2f(loc.res,canvas.width,canvas.height);gl.uniform1f(loc.yaw,manualYaw+gyroYaw);gl.uniform1f(loc.pitch,Math.max(-1.45,Math.min(1.45,manualPitch+gyroPitch)));gl.uniform1f(loc.fov,+fovEl.value);gl.uniform1f(loc.stereo,vrMode?1:0);gl.drawArrays(gl.TRIANGLES,0,6);requestAnimationFrame(draw)}draw();
 const fmt=s=>!isFinite(s)?'0:00':Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 fileEl.onchange=e=>{const f=e.target.files?.[0];if(!f)return;video.pause();if(lastURL)URL.revokeObjectURL(lastURL);lastURL=URL.createObjectURL(f);video.src=lastURL;video.playsInline=true;video.load();playBtn.textContent='▶ 再生'};
 playBtn.onclick=async()=>{if(!video.src){alert('先に動画を選択してください');return}try{if(video.paused){await video.play();playBtn.textContent='❚❚ 停止'}else{video.pause();playBtn.textContent='▶ 再生'}}catch(e){alert('Safariで動画を再生できません。動画のコーデックを確認してください。')}};
-video.onplay=()=>topLabel.style.display='none';video.onpause=()=>topLabel.style.display='';video.onloadedmetadata=()=>durationEl.textContent=fmt(video.duration);video.ontimeupdate=()=>{timeEl.textContent=fmt(video.currentTime);seekEl.value=video.duration?video.currentTime/video.duration*1000:0};video.onended=()=>{playBtn.textContent='▶ 再生';topLabel.style.display=''};
+video.onloadedmetadata=()=>durationEl.textContent=fmt(video.duration);video.ontimeupdate=()=>{timeEl.textContent=fmt(video.currentTime);seekEl.value=video.duration?video.currentTime/video.duration*1000:0};video.onended=()=>{playBtn.textContent='▶ 再生'};
 seekEl.oninput=()=>{if(video.duration)video.currentTime=seekEl.value/1000*video.duration};fovEl.oninput=()=>fovv.textContent=fovEl.value+'°';
 vrBtn.onclick=()=>{vrMode=!vrMode;vrBtn.classList.toggle('on',vrMode);vrBtn.textContent=vrMode?'✓ VR解除':'🥽 VRモード';panel.classList.toggle('hidden',vrMode);setTimeout(resize,50)};
-resetBtn.onclick=()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null;debugEl.textContent=gyroActive?'v5 • RESET…':'v5 • GYRO OFF'};
+resetBtn.onclick=()=>{manualYaw=manualPitch=gyroYaw=gyroPitch=0;baseQ=null;debugEl.textContent=gyroActive?'v6 • RESET…':'v6 • GYRO OFF'};
 canvas.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY});
 canvas.addEventListener('pointermove',e=>{if(!drag)return;manualYaw+=(e.clientX-lx)*.005;manualPitch+=(e.clientY-ly)*.005;lx=e.clientX;ly=e.clientY});
 addEventListener('pointerup',()=>drag=false);canvas.addEventListener('dblclick',()=>panel.classList.toggle('hidden'));
@@ -74,10 +73,10 @@ function deviceQ(e){const d=Math.PI/180,alpha=(e.alpha||0)*d,beta=(e.beta||0)*d,
 function orient(e){if(e.alpha==null)return;lastA=e.alpha||0;lastB=e.beta||0;lastG=e.gamma||0;const q=deviceQ(e);if(!baseQ){baseQ=q;return}
  const rel=mul(inv(baseQ),q),f=rotate(rel,[0,0,-1]);
  // 視線方向そのものを使う。左右は画面の向きと一致、上下も独立して反映。
- gyroYaw=Math.atan2(f[0],-f[2]);
- gyroPitch=-Math.atan2(f[1],Math.hypot(f[0],f[2]));
- debugEl.textContent=`v5 • Y ${Math.round(gyroYaw*57.3)}°  P ${Math.round(gyroPitch*57.3)}°\nα${Math.round(lastA)} β${Math.round(lastB)} γ${Math.round(lastG)}`;
+ gyroYaw=-Math.atan2(f[0],-f[2]);
+ gyroPitch=Math.atan2(f[1],Math.hypot(f[0],f[2]));
+ debugEl.textContent=`v6 • Y ${Math.round(gyroYaw*57.3)}°  P ${Math.round(gyroPitch*57.3)}°\nα${Math.round(lastA)} β${Math.round(lastB)} γ${Math.round(lastG)}`;
 }
-async function enableGyro(){try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted')throw new Error()}removeEventListener('deviceorientation',orient,true);addEventListener('deviceorientation',orient,true);gyroActive=true;baseQ=null;gyroBtn.classList.add('on');gyroBtn.textContent='✓ ジャイロON';debugEl.textContent='v5 • RESET…'}catch(e){alert('モーションセンサーを許可できませんでした。Safariのサイト設定も確認してください。')}}
+async function enableGyro(){try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted')throw new Error()}removeEventListener('deviceorientation',orient,true);addEventListener('deviceorientation',orient,true);gyroActive=true;baseQ=null;gyroBtn.classList.add('on');gyroBtn.textContent='✓ ジャイロON';debugEl.textContent='v6 • RESET…'}catch(e){alert('モーションセンサーを許可できませんでした。Safariのサイト設定も確認してください。')}}
 gyroBtn.onclick=enableGyro;
 </script></body></html>
